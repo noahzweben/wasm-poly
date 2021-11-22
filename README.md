@@ -1,107 +1,31 @@
+# PolyPrime
+This app takes a number and returns the next prime number. You can see it live at http://44.206.80.238/ (assuming I haven't taken down because my AWS bill is :'( )
+
+![](./polyprime.gif)
+
+
 # Getting started
+* Run `npm install && node node/app.js`
+* Access at `localhost:3000`
 
-![Build and test](https://github.com/second-state/wasmedge-nodejs-starter/workflows/Build%20and%20test/badge.svg)
 
-[Fork this project](https://github.com/second-state/wasmedge-nodejs-starter/fork) to create your own Rust functions as a web service.
+# Questions
+1. **How does your client "ask" the server to run the computation? Is there a way to do this without duplicating your libary SDK as an API?**
+  * Currently the client ships with the bundled prime.wasm. The client can chose to run this code in the browser (I    encapsulate in a webworker -- see below question) or run the code on the server. To avoid code duplicating code on the server, I was inspired by the Function As A Service (FaaS) functionality described in the wasmedge documentation. If the client ever wants to run the webassembly code remotely, it POSTs the wasm file to the Node along with a description of the internal function and arguments. The node server launches a WASMEdge runtime and executes the uploaded wasm function. This FaaS endpoint (`/execute_wasm` in `node/app.js`) is capable of running arbitrary wasm files/functions. Before feeling fully comfortable with this on a prodcuction system, I would want to verify/do further research into the sandboxed nature of WasmEdge runtimes to ensure user-uploaded wasm files cannot do anything malicious. Could also limit the executables by storing a list on the server of allowed wasm_binary hashes.
+
+2. **How do you make the library non-blocking (this is potentially outside of scope, but still interesting)**
+  * I focused primarily on making the library non-blocking on the client. Since the dom is powered by single-threaded JS, long running web-assembly code can freeze the front-end. To circumvent the issue, I abstracted a wasm executor in a web-worker which spins up a non-UI-blocking thread for computation. Similar to the `/execute_wasm` endpoint, `webworker_wasm.js` accepts an arbitrary wasm and function call - so is reusable across wasm files.
+  * I made the poly gem spin with javascript, so you can visually see that nothing is blocking the main js thread.
+
+3. **What are the benefits and drawbacks of this way of separating compute between the client and server?**
+  * Benefits: Run computations where most economical (compute costs) and fast (request latency, available server/client resources).
+  * Drawbacks: Touched on potential security implications above.
+
+## How to decide between server and client?
+Not implemented (in the demo I just randomly choose), but there are a few factors I would consider:
+1. **Latency**: can be determined using javascript. As latency of connection with remote server increases, I would prefer to use client to maintain user experience.
+2. **Cost**: All things equal, it is cheaper to use client to compute than paying for it on our servers
+3. **Available Client Resources**: Can use `console.memory` and other JS functions to get an understanding of whether the client has the available resources (CPU/memory/gpu) to compute within a reasonable time. If so -> client, else -> server.
 
 ## How it works
-
-* The Rust function source code is in the `src/lib.rs` file.
-* Use the [rustwasmc tool](https://www.secondstate.io/articles/rustwasmc/) to compile the Rust function into a WebAssembly module in the `pkg` directory.
-* Optional: Use the `node node/app.js` command to test the function locally in Node.js.
-* Upload the `pkg/*.wasm` file to the [Second State FaaS service](https://www.secondstate.io/articles/getting-started-with-function-as-a-service-in-rust/), OR to a [Node.js server](https://www.secondstate.io/articles/getting-started-with-rust-function/), to turn it into a web service.
-
-## Setup
-
-It is easy to use our `appdev` Docker image to run the dev environment. You can choose from `x86_64` or `aarch64` versions of the image. Alternatively, you could also use Github Codespaces to run the following example.
-
-```
-$ docker pull wasmedge/appdev_x86_64
-$ docker run -p 3000:3000 --rm -it -v $(pwd):/app wasmedge/appdev_x86_64
-(docker) #
-```
-
-## Build
-
-Use the `rustwasmc` command to build the Rust function into a WebAssembly bytecode file.
-
-```
-(docker) # cd /app
-(docker) # rustwasmc build
-```
-
-## Test and debug
-
-From the first terminal window, start the Node.js application.
-
-```
-(docker) # node node/app.js
-```
-
-From a second terminal window, you can test the local server.
-
-```
-$ curl http://localhost:3000/?name=WasmEdge
-hello WasmEdge
-```
-
-### Optional: Upload to the FaaS and test
-
-Upload the wasm file in the pkg folder to the FaaS. Double check the .wasm file name before you upload.
-
-```
-(docker) # curl --location --request POST 'https://rpc.ssvm.secondstate.io:8081/api/executables' \
---header 'Content-Type: application/octet-stream' \
---header 'SSVM-Description: say hello' \
---data-binary '@pkg/hello_lib_bg.wasm'
-```
-
-The FaaS returns
-
-```
-{"wasm_id":161,"wasm_sha256":"0xfb413547a8aba56d0349603a7989e269f3846245e51804932b3e02bc0be4b665","usage_key":"00000000-0000-0000-0000-000000000000","admin_key":"00xxxxxx-xxxx-xxxx-xxxx-4adc960fd2b8"}
-```
-
-Make a function call via the web.
-
-```
-(docker) # curl --location --request POST 'https://rpc.ssvm.secondstate.io:8081/api/run/161/say' \
---header 'Content-Type: text/plain' \
---data-raw 'Second State FaaS'
-hello Second State FaaS
-```
-
-You can easily incorporate this web service into your HTML web pages. [See how](https://www.secondstate.io/articles/getting-started-with-function-as-a-service-in-rust/#web-ui)
-
-## More exercises
-
-Now, you can copy and paste code from [this project](https://github.com/second-state/wasm-learning/tree/master/nodejs/functions).
-
-* `src/lib.rs` --> Replace with [code here](https://github.com/second-state/wasm-learning/blob/master/nodejs/functions/src/lib.rs)
-* `Cargo.toml` --> Replace with [code here](https://github.com/second-state/wasm-learning/blob/master/nodejs/functions/Cargo.toml)
-* `node/app.js` --> Replace with [code here](https://github.com/second-state/wasm-learning/blob/master/nodejs/functions/node/app.js)
-
-* FaaS deployment: https://github.com/second-state/wasm-learning/tree/master/faas
-* Node.js deployment: https://github.com/second-state/wasm-learning/tree/master/nodejs
-
-## Read more:
-
-* [Tutorials for FaaS](https://www.secondstate.io/faas/)
-  * [Getting started with FaaS in Rust](https://www.secondstate.io/articles/getting-started-with-function-as-a-service-in-rust/)
-  * [Use Binary Data as Function Input and Output](https://www.secondstate.io/articles/use-binary-data-as-function-input-and-output/)
-  * [Mixing Text and Binary Data in Call Arguments](https://www.secondstate.io/articles/mixing-text-and-binary-data-in-call-arguments/)
-  * [Internet of Functions: webhooks](https://www.secondstate.io/articles/internet-of-functions-webhooks/)
-  * [AI as A Service on WebAssembly](https://www.secondstate.io/articles/ai-as-a-servide-on-webaasembly/)
-* [Tutorials for Node.js micro-services](https://www.secondstate.io/ssvm/)
-  * [The Case for WebAssembly on the Server-side](https://www.secondstate.io/articles/why-webassembly-server/)
-  * [Getting started on Rust and WebAssembly for server-side apps](https://www.secondstate.io/articles/getting-started-with-rust-function/)
-  * [Passing function arguments in JSON](https://www.secondstate.io/articles/rust-functions-in-nodejs/)
-  * [Use Tensorflow and AI models from WebAssembly](https://www.secondstate.io/articles/face-detection-ai-as-a-service/)
-
-## Resources
-
-* [The WasmEdge Runtime](https://github.com/WasmEdge/WasmEdge) is a high performance WebAssembly virtual machine designed for edge computing (including Edge Cloud) applications.
-* [The rustwasmc](https://github.com/second-state/rustwasmc) is a [toolchain](https://www.secondstate.io/articles/rustwasmc/) for compiling Rust programs into WebAssembly, and then make them accessible from JavaScripts via the WasmEdge Runtime.
-* [The Second State FaaS](https://github.com/second-state/wasm-joey) is an open source FaaS engine based on WebAssembly and Node.js.
-
-Brought to you by the Open source dev team at [Second State](https://www.secondstate.io/). Follow us on [Twitter](https://twitter.com/secondstateinc), [Facebook](https://www.facebook.com/SecondState.io/), [LinkedIn](https://www.linkedin.com/company/second-state/), [YouTube](https://www.youtube.com/channel/UCePMT5duHcIbJlwJRSOPDMQ), or [Medium](https://medium.com/wasm)
+* The Rust function source code is in the `src/lib.rs` file, it is pre-compiled using `rustwasmc` into `prime.wasm`

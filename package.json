@@ -1,0 +1,8 @@
+{
+  "dependencies": {
+    "express": "^4.18.2",
+    "express-form-data": "^2.0.19",
+    "wasmedge-core": "^0.9.0",
+    "wasmedge-extensions": "^0.9.0"
+  }
+}

@@ -1,0 +1,26 @@
+<html>
+
+<head>
+    <script src="https://cdn.tailwindcss.com"></script>
+
+</head>
+
+<body style="background-color: black;">
+    <div class="p-5 text-white text-3xl"><img id="diamond" style="transform-origin:center" class="h-10 inline-block"
+            src="poly.png" /> Poly Prime</div>
+    <form id="submit_form" class="flex flex-col items-center justify-center my-10">
+        <div class="text-white">Find first prime larger than:</div>
+        <input id="fractal_size" type="number" value="1000" min="1000" max="4294967295" onChange="change(this.value)"
+            class="block bg-gray-200 text-center rounded-lg appearance-none cursor-pointer mt-1 dark:bg-gray-700" />
+        <input type="submit" id="drawButton"
+            class="block bg-red-500 hover:bg-blue-700 w-1/2 text-white font-bold py-2 px-4 mt-5 rounded">
+        Find Prime
+        </button>
+        <div id="result" class="text-white text-5xl mt-5">
+        </div>
+    </form>
+
+    <script src="prime.js"></script>
+</body>
+
+</html>

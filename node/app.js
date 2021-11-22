@@ -1,19 +1,29 @@
-const { say } = require('../pkg/wasmedge_nodejs_starter_lib.js');
+const express = require('express');
+const formData = require("express-form-data");
+const os = require("os");
+const wasmedge = require("wasmedge-core");
 
-const http = require('http');
-const url = require('url');
-const hostname = '0.0.0.0';
+const app = express();
 const port = 3000;
 
-const server = http.createServer((req, res) => {
-  const queryObject = url.parse(req.url,true).query;
-  if (!queryObject['name']) {
-    res.end(`Please use command curl http://${hostname}:${port}/?name=MyName \n`);
-  } else {
-    res.end(say(queryObject['name']) + '\n');
-  }
+app.use(express.static(__dirname + '/public'));
+app.use(express.urlencoded({ extended: false }));
+
+const options = {
+  uploadDir: os.tmpdir(),
+  autoClean: true
+};
+
+app.use(formData.parse(options));
+
+app.get('/', (req, res) => res.redirect("/index.html"));
+
+// endpoint to execute arbitrary wasm functions as a Function as a Service
+app.post('/execute_wasm', function (req, res) {
+  const call_fx = req.body.function;
+  const argument = parseInt(req.body.argument);
+  let vm = new wasmedge.VM(req.files.wasm.path, { args: process.argv, env: process.env, preopens: { '/': __dirname } });
+  res.send({ result: vm.RunInt(call_fx, argument) });
 });
 
-server.listen(port, hostname, () => {
-  console.log(`Server running at http://${hostname}:${port}/`);
-});
+app.listen(port, () => console.log(`Listening at http://localhost:${port}`))
